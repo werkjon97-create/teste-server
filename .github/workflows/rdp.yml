@@ -1,36 +1,31 @@
 name: Ubuntu RDP Environment
 
 on:
-  workflow_dispatch: # لتشغيل البيئة يدوياً في أي وقت
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 360 # أقصى مدة لتشغيل الـ Runner هي 6 ساعات
+    timeout-minutes: 360
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Desktop Environment & xRDP
+      - name: Fast Install Desktop Environment & xRDP
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
           sudo apt update
-          sudo apt install -y xfce4 xfce4-goodies xrdp
+          sudo apt install -y --no-install-recommends xfce4 xfce4-goodies xrdp
           sudo adduser xrdp ssl-cert
           sudo systemctl restart xrdp
 
       - name: Create RDP User & Set Password
         run: |
-          # 1. إنشاء المستخدم rdpuser
           sudo useradd -m -s /bin/bash rdpuser
-          
-          # 2. تعيين كلمة السر من الـ Secret
           echo "rdpuser:${{ secrets.USER_PASSWORD }}" | sudo chpasswd
-          
-          # 3. منح صلاحيات الأدمن (sudo)
           sudo usermod -aG sudo rdpuser
-          
-          # 4. ضبط واجهة XFCE للمستخدم
           echo "xfce4-session" | sudo tee /home/rdpuser/.xsession
           sudo chown rdpuser:rdpuser /home/rdpuser/.xsession
 
@@ -52,5 +47,4 @@ jobs:
           echo "------------------------------------------"
           echo "Username: rdpuser"
           echo "=========================================="
-          # الحفاظ على تشغيل السيرفر لمدة 6 ساعات
           sleep 21600
