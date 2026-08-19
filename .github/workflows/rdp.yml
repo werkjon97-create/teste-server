@@ -1,4 +1,4 @@
-name: Build and Setup Environment
+name: Ubuntu RDP Environment
 
 on:
   workflow_dispatch:
@@ -6,28 +6,57 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 360
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Fix APT Mirrors & Update Fast
+      - name: Fix APT Mirrors & Fast Install Desktop & xRDP
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          # 1. استبدال المرايا البطئية بالمستودع الرسمي السريع
+          # 1. استبدال المرايا البطيئة/المعطلة بمستودعات Ubuntu الرسمية
           sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu/|http://archive.ubuntu.com/ubuntu/|g' /etc/apt/sources.list /etc/apt/sources.list.d/*.list || true
           
-          # 2. تحديث الحزم بسرعة مع تحديد مهلة زمنية للمنع من التجمّد
-          sudo apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout="10"
+          # 2. تحديث الحزم مع مهلة زمنية لتجنب التعليق
+          sudo apt update -o Acquire::Retries=1 -o Acquire::http::Timeout="10"
+          
+          # 3. تثبيت واجهة XFCE و خادم xRDP
+          sudo apt install -y --no-install-recommends xfce4 xfce4-goodies xrdp ufw
+          
+          # ضبط صلاحيات xrdp
+          sudo adduser xrdp ssl-cert
+          
+          # التأكد من تكوين الجلسة
+          echo "xfce4-session" | sudo tee /etc/skel/.xsession
+          
+          # إعادة تشغيل الخدمة وتفعيلها
+          sudo systemctl enable xrdp
+          sudo systemctl restart xrdp
 
-      - name: Install Base Packages
+      - name: Create RDP User & Set Password
         run: |
-          # 3. تثبيت الأدوات الأساسية المطلوبة
-          sudo apt-get install -y --no-install-recommends \
-            curl \
-            wget \
-            git \
-            unzip
+          sudo useradd -m -s /bin/bash rdpuser
+          echo "rdpuser:${{ secrets.USER_PASSWORD }}" | sudo chpasswd
+          sudo usermod -aG sudo rdpuser
+          echo "xfce4-session" | sudo tee /home/rdpuser/.xsession
+          sudo chown rdpuser:rdpuser /home/rdpuser/.xsession
 
-      - name: Environment Ready
+      - name: Connect to Tailscale Network
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Keep Server Alive & Display IP
         run: |
-          echo "✅ تم تجهيز البيئة بنجاح وبسرعة دون التعليق في apt update!"
+          echo "=========================================="
+          echo "Checking xRDP Service Status:"
+          sudo systemctl status xrdp --no-pager || true
+          echo "------------------------------------------"
+          echo "Your Tailscale IP is:"
+          tailscale ip -4 || true
+          echo "------------------------------------------"
+          echo "Username: rdpuser"
+          echo "=========================================="
+          sleep 21600
