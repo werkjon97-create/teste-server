@@ -1,0 +1,42 @@
+name: Ubuntu RDP Environment
+
+on:
+  workflow_dispatch: # لتشغيل البيئة يدوياً في أي وقت
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360 # أقصى مدة لتشغيل الـ Runner هي 6 ساعات
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Desktop Environment & xRDP
+        run: |
+          sudo apt update
+          sudo apt install -y xfce4 xfce4-goodies xrdp
+          echo "xfce4-session" > ~/.xsession
+          sudo adduser xrdp ssl-cert
+          sudo systemctl restart xrdp
+
+      - name: Set User Password
+        run: |
+          echo "runneradmin:${{ secrets.USER_PASSWORD }}" | sudo chpasswd
+
+      - name: Connect to Tailscale Network
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ""
+          oauth-secret: ""
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Keep Server Alive
+        run: |
+          echo "=========================================="
+          echo "RDP Server is READY!"
+          echo "Connect via your Tailscale IP on Port 3389"
+          echo "Username: runneradmin"
+          echo "=========================================="
+          # الحفاظ على السيرفر شغالاً طوال مدة الجلسة
+          sleep 21600
