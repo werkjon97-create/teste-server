@@ -21,23 +21,25 @@ jobs:
 
       - name: Create RDP User & Set Password
         run: |
-          # 1. إنشاء مستخدم جديد باسم rdpuser
+          # 1. إنشاء المستخدم rdpuser
           sudo useradd -m -s /bin/bash rdpuser
           
-          # 2. تعيين كلمة السر المأخوذة من الـ Secret
+          # 2. تعيين كلمة السر من السر المخزن في GitHub
           echo "rdpuser:${{ secrets.USER_PASSWORD }}" | sudo chpasswd
           
-          # 3. إعطاء المستخدم صلاحيات الأدمن (sudo)
+          # 3. منح صلاحيات الأدمن (sudo)
           sudo usermod -aG sudo rdpuser
           
-          # 4. ضبط واجهة XFCE للمستخدم الجديد
+          # 4. ضبط واجهة XFCE للمستخدم
           echo "xfce4-session" | sudo tee /home/rdpuser/.xsession
           sudo chown rdpuser:rdpuser /home/rdpuser/.xsession
 
       - name: Connect to Tailscale Network
-        uses: tailscale/github-action@v2
+        uses: tailscale/github-action@v3
         with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
 
       - name: Keep Server Alive
         run: |
@@ -46,5 +48,5 @@ jobs:
           echo "Connect via your Tailscale IP on Port 3389"
           echo "Username: rdpuser"
           echo "=========================================="
-          # الحفاظ على السيرفر شغالاً لمدة 6 ساعات
+          # الحفاظ على تشغيل السيرفر لمدة 6 ساعات
           sleep 21600
