@@ -16,19 +16,27 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y xfce4 xfce4-goodies xrdp
-          echo "xfce4-session" > ~/.xsession
           sudo adduser xrdp ssl-cert
           sudo systemctl restart xrdp
 
-      - name: Set User Password
+      - name: Create RDP User & Set Password
         run: |
-          echo "runneradmin:${{ secrets.USER_PASSWORD }}" | sudo chpasswd
+          # 1. إنشاء مستخدم جديد باسم rdpuser
+          sudo useradd -m -s /bin/bash rdpuser
+          
+          # 2. تعيين كلمة السر المأخوذة من الـ Secret
+          echo "rdpuser:${{ secrets.USER_PASSWORD }}" | sudo chpasswd
+          
+          # 3. إعطاء المستخدم صلاحيات الأدمن (sudo)
+          sudo usermod -aG sudo rdpuser
+          
+          # 4. ضبط واجهة XFCE للمستخدم الجديد
+          echo "xfce4-session" | sudo tee /home/rdpuser/.xsession
+          sudo chown rdpuser:rdpuser /home/rdpuser/.xsession
 
       - name: Connect to Tailscale Network
         uses: tailscale/github-action@v2
         with:
-          oauth-client-id: ""
-          oauth-secret: ""
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
       - name: Keep Server Alive
@@ -36,7 +44,7 @@ jobs:
           echo "=========================================="
           echo "RDP Server is READY!"
           echo "Connect via your Tailscale IP on Port 3389"
-          echo "Username: runneradmin"
+          echo "Username: rdpuser"
           echo "=========================================="
-          # الحفاظ على السيرفر شغالاً طوال مدة الجلسة
+          # الحفاظ على السيرفر شغالاً لمدة 6 ساعات
           sleep 21600
