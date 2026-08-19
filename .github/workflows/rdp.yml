@@ -1,4 +1,4 @@
-name: Ubuntu RDP Environment
+name: Ubuntu SSH Environment
 
 on:
   workflow_dispatch:
@@ -12,36 +12,31 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Fix APT Mirrors & Fast Install Desktop & xRDP
+      - name: Force Clean Repos & Fast Update
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          # 1. استبدال المرايا البطيئة/المعطلة بمستودعات Ubuntu الرسمية
-          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu/|http://archive.ubuntu.com/ubuntu/|g' /etc/apt/sources.list /etc/apt/sources.list.d/*.list || true
-          
-          # 2. تحديث الحزم مع مهلة زمنية لتجنب التعليق
-          sudo apt update -o Acquire::Retries=1 -o Acquire::http::Timeout="10"
-          
-          # 3. تثبيت واجهة XFCE و خادم xRDP
-          sudo apt install -y --no-install-recommends xfce4 xfce4-goodies xrdp ufw
-          
-          # ضبط صلاحيات xrdp
-          sudo adduser xrdp ssl-cert
-          
-          # التأكد من تكوين الجلسة
-          echo "xfce4-session" | sudo tee /etc/skel/.xsession
-          
-          # إعادة تشغيل الخدمة وتفعيلها
-          sudo systemctl enable xrdp
-          sudo systemctl restart xrdp
+          # 1. إزالة كافة ملفات المصادر القديمة المسببة للبطء
+          sudo rm -rf /etc/apt/sources.list /etc/apt/sources.list.d/*
 
-      - name: Create RDP User & Set Password
+          # 2. إضافة المصادر الرسمية المباشرة
+          echo "deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse" | sudo tee /etc/apt/sources.list
+          echo "deb http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          echo "deb http://archive.ubuntu.com/ubuntu noble-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+
+          # 3. تحديث قائمة الحزم وتثبيت OpenSSH
+          sudo apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout="10"
+          sudo apt-get install -y openssh-server
+
+          # 4. تشغيل خدمة SSH
+          sudo systemctl enable ssh
+          sudo systemctl restart ssh
+
+      - name: Create SSH User & Set Password
         run: |
           sudo useradd -m -s /bin/bash rdpuser
           echo "rdpuser:${{ secrets.USER_PASSWORD }}" | sudo chpasswd
           sudo usermod -aG sudo rdpuser
-          echo "xfce4-session" | sudo tee /home/rdpuser/.xsession
-          sudo chown rdpuser:rdpuser /home/rdpuser/.xsession
 
       - name: Connect to Tailscale Network
         uses: tailscale/github-action@v2
@@ -51,12 +46,14 @@ jobs:
       - name: Keep Server Alive & Display IP
         run: |
           echo "=========================================="
-          echo "Checking xRDP Service Status:"
-          sudo systemctl status xrdp --no-pager || true
+          echo "Checking SSH Service Status:"
+          sudo systemctl status ssh --no-pager || true
           echo "------------------------------------------"
           echo "Your Tailscale IP is:"
-          tailscale ip -4 || true
+          SSH_IP=$(tailscale ip -4 || true)
+          echo "$SSH_IP"
           echo "------------------------------------------"
-          echo "Username: rdpuser"
+          echo "Connect via SSH:"
+          echo "ssh rdpuser@$SSH_IP"
           echo "=========================================="
           sleep 21600
