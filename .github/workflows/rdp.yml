@@ -24,7 +24,7 @@ jobs:
           # 1. إنشاء المستخدم rdpuser
           sudo useradd -m -s /bin/bash rdpuser
           
-          # 2. تعيين كلمة السر من السر المخزن في GitHub
+          # 2. تعيين كلمة السر من الـ Secret
           echo "rdpuser:${{ secrets.USER_PASSWORD }}" | sudo chpasswd
           
           # 3. منح صلاحيات الأدمن (sudo)
@@ -35,17 +35,21 @@ jobs:
           sudo chown rdpuser:rdpuser /home/rdpuser/.xsession
 
       - name: Connect to Tailscale Network
-        uses: tailscale/github-action@v3
+        uses: tailscale/github-action@v2
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
+          tags: tag:container
 
-      - name: Keep Server Alive
+      - name: Keep Server Alive & Display IP
         run: |
           echo "=========================================="
-          echo "RDP Server is READY!"
-          echo "Connect via your Tailscale IP on Port 3389"
+          echo "RDP Server Status:"
+          tailscale status || true
+          echo "------------------------------------------"
+          echo "Your Tailscale IP is:"
+          tailscale ip -4 || true
+          echo "------------------------------------------"
           echo "Username: rdpuser"
           echo "=========================================="
           # الحفاظ على تشغيل السيرفر لمدة 6 ساعات
