@@ -17,8 +17,16 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo apt update
-          sudo apt install -y --no-install-recommends xfce4 xfce4-goodies xrdp
+          sudo apt install -y --no-install-recommends xfce4 xfce4-goodies xrdp ufw
+          
+          # ضبط صلاحيات xrdp
           sudo adduser xrdp ssl-cert
+          
+          # التأكد من تكوين الجلسة
+          echo "xfce4-session" | sudo tee /etc/skel/.xsession
+          
+          # إعادة تشغيل الخدمة وتفعيلها
+          sudo systemctl enable xrdp
           sudo systemctl restart xrdp
 
       - name: Create RDP User & Set Password
@@ -37,8 +45,8 @@ jobs:
       - name: Keep Server Alive & Display IP
         run: |
           echo "=========================================="
-          echo "RDP Server Status:"
-          tailscale status || true
+          echo "Checking xRDP Service Status:"
+          sudo systemctl status xrdp --no-pager || true
           echo "------------------------------------------"
           echo "Your Tailscale IP is:"
           tailscale ip -4 || true
